@@ -37,7 +37,10 @@ class TestNetMonClass(unittest.TestCase):
     def tearDown(self):
         self.netmon = None
 
-    def test_put(self):
+    @patch("netmon.subprocess")
+    def test_put(self, subprocess):
+        subprocess.check_output.return_value = True
+        subprocess.call.return_value = True
         test_msg = {
             "id": 12345,
             "method": "put",
@@ -77,7 +80,9 @@ class TestNetMonClass(unittest.TestCase):
         def resp4(code=200, data=None):
             pass
         message = Message(test1_msg)
-        self.netmon.get_root(message, response=resp4, test=True)
+        with patch("netmon.subprocess") as subprocess:
+            subprocess.check_output.return_value = True
+            self.netmon.get_root(message, response=resp4, test=True)
 
         # case 5: data
         def resp5(code=200, data=None):
