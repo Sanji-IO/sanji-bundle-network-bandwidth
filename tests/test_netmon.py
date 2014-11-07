@@ -26,11 +26,13 @@ dirpath = os.path.dirname(os.path.realpath(__file__))
 
 
 class TestNetMonClass(unittest.TestCase):
-    def zombiefn(self):
-        pass
 
     def setUp(self):
+        def zombiefn():
+            pass
         self.netmon = NetworkMonitor(connection=Mockup())
+        self.netmon.do_start = zombiefn
+        self.netmon.do_stop = zombiefn
 
     def tearDown(self):
         self.netmon = None
@@ -92,6 +94,7 @@ class TestNetMonClass(unittest.TestCase):
         self.netmon.put_monitor(message, response=resp6, test=True)
 
     def test_do_start(self):
+        self.netmon = NetworkMonitor(connection=Mockup())
         with patch("netmon.subprocess") as subprocess:
             subprocess.call.return_value = True
             self.netmon.do_start()
@@ -99,6 +102,7 @@ class TestNetMonClass(unittest.TestCase):
                 self.netmon.VNSTAT_START, shell=True)
 
     def test_do_stop(self):
+        self.netmon = NetworkMonitor(connection=Mockup())
         with patch("netmon.subprocess") as subprocess:
             subprocess.call.return_value = True
             self.netmon.do_stop()
