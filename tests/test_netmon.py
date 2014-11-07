@@ -63,7 +63,7 @@ class TestNetMonClass(unittest.TestCase):
 
         # case 3: data
         def resp3(code=200, data=None):
-            pass
+            self.assertEqual(200, code)
         test_msg["data"] = {"reset": 1}
         message = Message(test_msg)
         self.netmon.put_monitor(message, response=resp3, test=True)
@@ -78,7 +78,7 @@ class TestNetMonClass(unittest.TestCase):
 
         # case 4: data have interface
         def resp4(code=200, data=None):
-            pass
+            self.assertEqual(200, code)
         message = Message(test1_msg)
         with patch("netmon.subprocess") as subprocess:
             subprocess.check_output.return_value = True
@@ -86,14 +86,14 @@ class TestNetMonClass(unittest.TestCase):
 
         # case 5: data
         def resp5(code=200, data=None):
-            pass
+            self.assertEqual(200, code)
         test1_msg["data"] = {"enable": 1}
         message = Message(test1_msg)
         self.netmon.put_monitor(message, response=resp5, test=True)
 
         # case 6: data
         def resp6(code=200, data=None):
-            pass
+            self.assertEqual(200, code)
         test1_msg["data"] = {"enable": 0}
         message = Message(test1_msg)
         self.netmon.put_monitor(message, response=resp6, test=True)
