@@ -33,6 +33,7 @@ class TestNetMonClass(unittest.TestCase):
         self.netmon = NetworkMonitor(connection=Mockup())
         self.netmon.do_start = zombiefn
         self.netmon.do_stop = zombiefn
+        self.netmon.read_bandwidth = zombiefn
 
     def tearDown(self):
         self.netmon = None
