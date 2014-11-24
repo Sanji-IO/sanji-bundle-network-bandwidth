@@ -3,6 +3,9 @@
 import os
 import logging
 import subprocess
+import xml.etree.ElementTree as ET
+from time import sleep
+from datetime import datetime
 from sanji.core import Sanji
 from sanji.core import Route
 from sanji.connection.mqtt import Mqtt
@@ -22,6 +25,7 @@ class NetworkMonitor(Sanji):
         self.model = ModelInitiator("netmon", path_root)
         self.interface = "eth0"
         self.vnstat_start = self.model.db["enable"]
+        self.threshold = self.model.db["threshold"]
 
         # try:
         #     bundle_env = kwargs["bundle_env"]
@@ -31,17 +35,51 @@ class NetworkMonitor(Sanji):
         if self.vnstat_start == 1:
             self.do_start()
 
-    @Route(methods="get", resource="/network/monitor/:interface")
-    def get_root(self, message, response):
-        self.interface = message.param["interface"]
-        return response(code=200, data={
-            "info": subprocess.check_output("vnstat --xml -i " +
-                                            message.param["interface"],
-                                            shell=True),
-            "enable": self.vnstat_start,
-            "interface": self.interface})
+    def read_bandwidth(self):
+            tmp = subprocess.check_output("vnstat --xml -i " +
+                                          self.interface +
+                                          "|grep -m 1 total", shell=True)
+            root = ET.fromstring(tmp)
+            count = 0
+            for item in root:
+                count += int(item.text)
+            logger.debug("total %s" % count)
+            return count
 
-    @Route(methods="put", resource="/network/monitor")
+    # This function will be executed after registered.
+    def run(self):
+
+        while True:
+            time_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            logger.debug("time: %s" % time_str)
+            # message of today
+            motd = 0
+            count = self.read_bandwidth()
+            if count > self.threshold:
+                while True:
+                    if motd == 0:
+                        logger.debug("Threshold %s" % self.threshold)
+                        # event would not have response
+                        # self.publish.event("/remote/sanji/events",
+                        # data={"message": "Time: %s" % time_str})
+                    if (motd >= 86400) or (self.read_bandwidth() == 0):
+                        break
+                    else:
+                        motd += 1
+
+                    sleep(1)
+
+            sleep(60)
+
+    @Route(methods="get", resource="/network/bandwidth")
+    def get_root(self, message, response):
+            return response(code=200, data={
+                "info": self.read_bandwidth(),
+                "enable": self.vnstat_start,
+                "interface": self.interface,
+                "threshold": self.threshold})
+
+    @Route(methods="put", resource="/network/bandwidth")
     def put_monitor(self, message, response):
         # TODO: status code should be added into error message
         if not hasattr(message, "data"):
@@ -53,11 +91,20 @@ class NetworkMonitor(Sanji):
             else:
                 self.do_stop()
             self.model.db["enable"] = message.data["enable"]
+            self.vnstat_stat = message.data["enable"]
 
         if "reset" in message.data:
             if message.data["reset"] == 1:
                 logger.debug("Reset network monitor statistic DB.")
                 self.do_clean()
+
+        if "interface" in message.data:
+            self.model.db["interface"] = message.data["interface"]
+            self.interface = message.data["interface"]
+
+        if "threshold" in message.data:
+            self.model.db["threshold"] = message.data["threshold"]
+            self.threshold = message.data["threshold"]
 
         self.model.save_db()
         return response()

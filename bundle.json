@@ -16,7 +16,7 @@
   "resources": [
     {
       "methods": ["put"],
-      "resource": "/network/monitor"
+      "resource": "/network/bandwidth"
     }
   ]
 }

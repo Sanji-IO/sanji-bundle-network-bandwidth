@@ -44,7 +44,7 @@ class TestNetMonClass(unittest.TestCase):
         test_msg = {
             "id": 12345,
             "method": "put",
-            "resource": "/network/monitor"
+            "resource": "/network/bandwidth"
         }
 
         # case 1: no data attribute
@@ -70,19 +70,16 @@ class TestNetMonClass(unittest.TestCase):
 
     def test2_put(self):
         test1_msg = {
-            "id": 12365,
+            "id": 1,
             "method": "get",
-            "resource": "/network/monitor/eth1",
+            "resource": "/network/bandwidth",
             "param": {"interface": "eth1"}
             }
 
         # case 4: data have interface
         def resp4(code=200, data=None):
             self.assertEqual(200, code)
-        message = Message(test1_msg)
-        with patch("netmon.subprocess") as subprocess:
-            subprocess.check_output.return_value = True
-            self.netmon.get_root(message, response=resp4, test=True)
+        test1_msg["data"] = {"enable": 1}
 
         # case 5: data
         def resp5(code=200, data=None):
@@ -97,6 +94,25 @@ class TestNetMonClass(unittest.TestCase):
         test1_msg["data"] = {"enable": 0}
         message = Message(test1_msg)
         self.netmon.put_monitor(message, response=resp6, test=True)
+
+        # case 7: data
+        def resp7(code=200, data=None):
+            self.assertEqual(200, code)
+        test1_msg["data"] = {"threshold": 50}
+        message = Message(test1_msg)
+        self.netmon.put_monitor(message, response=resp7, test=True)
+
+        # case 8: data
+        def resp8(code=200, data=None):
+            self.assertEqual(200, code)
+        test1_msg["data"] = {"interface": "eth0"}
+        message = Message(test1_msg)
+        self.netmon.put_monitor(message, response=resp8, test=True)
+
+        # case 9: data
+        def resp9(code=200, data=None):
+            self.assertEqual(200, code)
+        self.netmon.get_root(message, response=resp9, test=True)
 
     def test_do_start(self):
         self.netmon = NetworkMonitor(connection=Mockup())
@@ -113,6 +129,16 @@ class TestNetMonClass(unittest.TestCase):
             self.netmon.do_stop()
             subprocess.call.assert_called_once_with(
                 self.netmon.VNSTAT_STOP, shell=True)
+
+    def test_read_bandwidth(self):
+        self.netmon = NetworkMonitor(connection=Mockup())
+        with patch("netmon.subprocess") as subprocess:
+            subprocess.check_output.return_value = \
+                "<total><rx>1</rx><tx>1</tx></total>"
+            self.netmon.read_bandwidth()
+            subprocess.check_output.assert_called_once_with(
+                "vnstat --xml -i " + self.netmon.interface
+                + "|grep -m 1 total", shell=True)
 
     def test_init(self):
         with patch("netmon.ModelInitiator") as model:

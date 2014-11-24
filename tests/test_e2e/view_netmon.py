@@ -7,7 +7,7 @@ from sanji.core import Sanji
 from sanji.connection.mqtt import Mqtt
 
 
-REQ_RESOURCE = "/network/monitor"
+REQ_RESOURCE = "/network/bandwidth"
 
 
 class View(Sanji):

@@ -15,7 +15,7 @@
   "ttl": 10,
   "resources": [
     {
-      "resource": "/network/monitor"
+      "resource": "/network/bandwidth"
     }
   ]
 }
