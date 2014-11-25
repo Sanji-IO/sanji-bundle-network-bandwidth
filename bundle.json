@@ -1,0 +1,22 @@
+{
+  "name": "network monitor",
+  "version": "1.0",
+  "author": "Jimmy Chen",
+  "email": "jimmy.chen@moxa.com",
+  "description": "Monitoring network bandwidth; alert if reaching watermark.",
+  "license": "MOXA",
+  "main": "netmon.py",
+  "argument": "",
+  "priority": 20,
+  "hook": [],
+  "dependencies": {},
+  "repository": "",
+  "role": "model",
+  "ttl": 10,
+  "resources": [
+    {
+      "methods": ["put"],
+      "resource": "/network/bandwidth"
+    }
+  ]
+}

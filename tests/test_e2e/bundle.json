@@ -1,0 +1,21 @@
+{
+  "name": "view_netmon",
+  "version": "1.0",
+  "author": "Jimmy Chen",
+  "email": "jimmy.chen@moxa.com",
+  "description": "A test view for network monitor bundle",
+  "license": "MOXA",
+  "main": "view_netmon.py",
+  "argument": "",
+  "priority": 20,
+  "hook": [],
+  "dependencies": {},
+  "repository": "",
+  "role": "view",
+  "ttl": 10,
+  "resources": [
+    {
+      "resource": "/network/bandwidth"
+    }
+  ]
+}
