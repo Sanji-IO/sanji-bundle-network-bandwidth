@@ -23,12 +23,12 @@ class NetworkMonitor(Sanji):
     VNSTAT_START = "/etc/init.d/vnstat start"
     VNSTAT_STOP = "/etc/init.d/vnstat stop"
 
-    PUT_SCHEMA = Schema([{
+    PUT_SCHEMA = Schema({
         "enable": All(int, Range(min=0, max=1)),
         "reset": All(int, Range(min=0, max=1)),
-        "interface": All(str, Length(255)),
+        "interface": All(str, Length(1, 255)),
         "threshold": int
-    }], extra=REMOVE_EXTRA)
+    }, extra=REMOVE_EXTRA)
 
     def init(self, *args, **kwargs):
         path_root = os.path.abspath(os.path.dirname(__file__))
