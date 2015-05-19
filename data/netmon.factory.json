@@ -1,4 +1,5 @@
 {
-"enable": 1,
-"threshold": 50
+	"interface": "wwan1",
+	"enable": 1,
+	"threshold": 50
 }

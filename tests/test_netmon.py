@@ -10,6 +10,7 @@ import unittest
 from sanji.connection.mockup import Mockup
 from sanji.message import Message
 from mock import patch
+from mock import call
 
 try:
     sys.path.append(os.path.dirname(os.path.realpath(__file__)) + "/../")
@@ -120,8 +121,9 @@ class TestNetMonClass(unittest.TestCase):
         with patch("netmon.subprocess") as subprocess:
             subprocess.call.return_value = True
             self.netmon.do_start()
-            subprocess.call.assert_called_once_with(
-                self.netmon.VNSTAT_START, shell=True)
+            subprocess.assert_has_calls([
+                call.call(["vnstat", "-u", "-i", self.netmon.interface]),
+                call.call(self.netmon.VNSTAT_START, shell=True)])
 
     def test_do_stop(self):
         self.netmon = NetworkMonitor(connection=Mockup())

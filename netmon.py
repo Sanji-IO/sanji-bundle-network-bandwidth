@@ -5,15 +5,13 @@ import logging
 import subprocess
 import xml.etree.ElementTree as ET
 from time import sleep
-from datetime import datetime
 from sanji.core import Sanji
 from sanji.core import Route
 from sanji.connection.mqtt import Mqtt
 from sanji.model_initiator import ModelInitiator
 
 
-# TODO: logger should be defined in sanji package?
-logger = logging.getLogger()
+_logger = logging.getLogger("sanji.networkmonitor")
 
 
 class NetworkMonitor(Sanji):
@@ -23,61 +21,65 @@ class NetworkMonitor(Sanji):
     def init(self, *args, **kwargs):
         path_root = os.path.abspath(os.path.dirname(__file__))
         self.model = ModelInitiator("netmon", path_root)
-        self.interface = "eth0"
+        self.interface = self.model.db["interface"]
         self.vnstat_start = self.model.db["enable"]
         self.threshold = self.model.db["threshold"]
-
-        # try:
-        #     bundle_env = kwargs["bundle_env"]
-        # except KeyError:
-        #     bundle_env = os.getenv("BUNDLE_ENV", "debug")
 
         if self.vnstat_start == 1:
             self.do_start()
 
     def read_bandwidth(self):
-            tmp = subprocess.check_output("vnstat --xml -i " +
-                                          self.interface +
-                                          "|grep -m 1 total", shell=True)
-            root = ET.fromstring(tmp)
-            count = 0
-            for item in root:
-                count += int(item.text)
-            logger.debug("total %s" % count)
-            return count
+        tmp = subprocess.check_output("vnstat --xml -i " +
+                                      self.interface +
+                                      "|grep -m 1 total", shell=True)
+        root = ET.fromstring(tmp)
+        count = 0
+        for item in root:
+            count += int(item.text)
+        _logger.debug("Read Bandwidth %s" % count)
+        return count
 
     # This function will be executed after registered.
     def run(self):
 
         while True:
-            time_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            logger.debug("time: %s" % time_str)
             # message of today
             motd = 0
             count = self.read_bandwidth()
-            if count > self.threshold:
-                while True:
-                    if motd == 0:
-                        logger.debug("Threshold %s" % self.threshold)
-                        # event would not have response
-                        # self.publish.event("/remote/sanji/events",
-                        # data={"message": "Time: %s" % time_str})
-                    if (motd >= 86400) or (self.read_bandwidth() == 0):
-                        break
-                    else:
-                        motd += 1
+            if count < self.threshold:
+                continue
 
-                    sleep(1)
+            while True:
+                if motd == 0:
+                    self.publish.event(
+                        "/network/bandwidth/event",
+                        data={
+                            "info": self.read_bandwidth(),
+                            "enable": self.vnstat_start,
+                            "interface": self.interface,
+                            "threshold": self.threshold
+                        })
+                if motd % 60 == 0:
+                    _logger.debug(
+                        "Reach limited threshold %s" % self.threshold)
+                if (motd >= 60) or (self.read_bandwidth() == 0):
+                    break
+                else:
+                    motd += 1
+
+                sleep(1)
 
             sleep(60)
 
     @Route(methods="get", resource="/network/bandwidth")
     def get_root(self, message, response):
-            return response(code=200, data={
+        return response(
+            data={
                 "info": self.read_bandwidth(),
                 "enable": self.vnstat_start,
                 "interface": self.interface,
-                "threshold": self.threshold})
+                "threshold": self.threshold
+            })
 
     @Route(methods="put", resource="/network/bandwidth")
     def put_monitor(self, message, response):
@@ -95,10 +97,12 @@ class NetworkMonitor(Sanji):
 
         if "reset" in message.data:
             if message.data["reset"] == 1:
-                logger.debug("Reset network monitor statistic DB.")
+                _logger.debug("Reset network monitor statistic DB.")
                 self.do_clean()
 
         if "interface" in message.data:
+            if self.model.db["interface"] != message.data["interface"]:
+                self.do_clean(start=False)
             self.model.db["interface"] = message.data["interface"]
             self.interface = message.data["interface"]
 
@@ -107,22 +111,27 @@ class NetworkMonitor(Sanji):
             self.threshold = message.data["threshold"]
 
         self.model.save_db()
-        return response()
+        return response(data=self.model.db)
 
     def do_start(self):
-        logger.debug("Start network monitor.")
+        _logger.debug("Start network monitor.")
         self.vnstat_start = 1
+        subprocess.call(["vnstat", "-u", "-i", self.interface])
         subprocess.call(self.VNSTAT_START, shell=True)
 
     def do_stop(self):
-        logger.debug("Stop network monitor.")
+        _logger.debug("Stop network monitor.")
         self.vnstat_start = 0
         subprocess.call(self.VNSTAT_STOP, shell=True)
 
-    def do_clean(self):
+    def do_clean(self, start=True):
+        _logger.debug("Clean vnstat with interface %s" % (self.interface,))
         self.do_stop()
         subprocess.call("vnstat --delete --force  -i " +
                         self.interface, shell=True)
+        if start is False:
+            return
+        _logger.debug("Update vnstat with interface %s" % (self.interface,))
         subprocess.call("vnstat -u -i " + self.interface, shell=True)
         self.do_start()
 
@@ -130,7 +139,7 @@ class NetworkMonitor(Sanji):
 if __name__ == "__main__":
     FORMAT = "%(asctime)s - %(levelname)s - %(lineno)s - %(message)s"
     logging.basicConfig(level=0, format=FORMAT)
-    logger = logging.getLogger("Network Bandwidth Monitor")
+    _logger = logging.getLogger("sanji.networkmonitor")
 
     netbmon = NetworkMonitor(connection=Mqtt())
     netbmon.start()
