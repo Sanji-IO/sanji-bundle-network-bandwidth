@@ -29,6 +29,7 @@ class NetworkMonitor(Sanji):
             self.do_start()
 
     def read_bandwidth(self):
+        subprocess.call(["vnstat", "-u", "-i", self.interface])
         tmp = subprocess.check_output("vnstat --xml -i " +
                                       self.interface +
                                       "|grep -m 1 total", shell=True)
@@ -47,11 +48,14 @@ class NetworkMonitor(Sanji):
             motd = 0
             count = self.read_bandwidth()
             if count < self.threshold:
+                sleep(60)
                 continue
 
             while True:
                 if motd == 0:
-                    self.publish.event(
+                    _logger.debug(
+                        "Reach limited threshold %s" % self.threshold)
+                    self.publish.event.put(
                         "/network/bandwidth/event",
                         data={
                             "info": self.read_bandwidth(),
@@ -59,17 +63,12 @@ class NetworkMonitor(Sanji):
                             "interface": self.interface,
                             "threshold": self.threshold
                         })
-                if motd % 60 == 0:
-                    _logger.debug(
-                        "Reach limited threshold %s" % self.threshold)
-                if (motd >= 60) or (self.read_bandwidth() == 0):
+
+                if motd >= 5 or self.read_bandwidth() == 0:
                     break
-                else:
-                    motd += 1
 
-                sleep(1)
-
-            sleep(60)
+                motd += 1
+                sleep(60)
 
     @Route(methods="get", resource="/network/bandwidth")
     def get_root(self, message, response):
