@@ -10,6 +10,11 @@ from sanji.core import Route
 from sanji.connection.mqtt import Mqtt
 from sanji.model_initiator import ModelInitiator
 
+from voluptuous import Schema
+from voluptuous import REMOVE_EXTRA
+from voluptuous import Range
+from voluptuous import All
+from voluptuous import Length
 
 _logger = logging.getLogger("sanji.networkmonitor")
 
@@ -17,6 +22,13 @@ _logger = logging.getLogger("sanji.networkmonitor")
 class NetworkMonitor(Sanji):
     VNSTAT_START = "/etc/init.d/vnstat start"
     VNSTAT_STOP = "/etc/init.d/vnstat stop"
+
+    PUT_SCHEMA = Schema([{
+        "enable": All(int, Range(min=0, max=1)),
+        "reset": All(int, Range(min=0, max=1)),
+        "interface": All(str, Length(255)),
+        "threshold": int
+    }], extra=REMOVE_EXTRA)
 
     def init(self, *args, **kwargs):
         path_root = os.path.abspath(os.path.dirname(__file__))
@@ -80,9 +92,8 @@ class NetworkMonitor(Sanji):
                 "threshold": self.threshold
             })
 
-    @Route(methods="put", resource="/network/bandwidth")
+    @Route(methods="put", resource="/network/bandwidth", schema=PUT_SCHEMA)
     def put_monitor(self, message, response):
-        # TODO: status code should be added into error message
         if not hasattr(message, "data"):
             return response(code=400, data={"message": "Invalid Input."})
 
@@ -126,12 +137,14 @@ class NetworkMonitor(Sanji):
     def do_clean(self, start=True):
         _logger.debug("Clean vnstat with interface %s" % (self.interface,))
         self.do_stop()
-        subprocess.call("vnstat --delete --force  -i " +
-                        self.interface, shell=True)
+        subprocess.call(
+            ["vnstat", "--delete", "--force", "-i", self.interface])
+
         if start is False:
             return
+
         _logger.debug("Update vnstat with interface %s" % (self.interface,))
-        subprocess.call("vnstat -u -i " + self.interface, shell=True)
+        subprocess.call(["vnstat", "-u", "-i", self.interface])
         self.do_start()
 
 
