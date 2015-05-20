@@ -1,0 +1,5 @@
+{
+	"interface": "wwan1",
+	"enable": 0,
+	"threshold": 102400
+}

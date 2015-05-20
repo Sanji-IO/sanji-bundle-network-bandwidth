@@ -70,7 +70,8 @@ class TestNetMonClass(unittest.TestCase):
         message = Message(test_msg)
         self.netmon.put_monitor(message, response=resp3, test=True)
 
-    def test2_put(self):
+    @patch("netmon.subprocess")
+    def test2_put(self, subprocess):
         test1_msg = {
             "id": 1,
             "method": "get",
