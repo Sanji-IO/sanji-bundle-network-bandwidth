@@ -77,7 +77,7 @@ class TestNetMonClass(unittest.TestCase):
             "method": "get",
             "resource": "/network/bandwidth",
             "param": {"interface": "eth1"}
-            }
+        }
 
         # case 4: data have interface
         def resp4(code=200, data=None):
@@ -123,7 +123,8 @@ class TestNetMonClass(unittest.TestCase):
             subprocess.call.return_value = True
             self.netmon.do_start()
             subprocess.assert_has_calls([
-                call.call(["vnstat", "-u", "-i", self.netmon.interface]),
+                call.call(
+                    ["vnstat", "-u", "-i", self.netmon.model.db["interface"]]),
                 call.call(self.netmon.VNSTAT_START, shell=True)])
 
     def test_do_stop(self):
@@ -141,7 +142,7 @@ class TestNetMonClass(unittest.TestCase):
                 "<total><rx>1</rx><tx>1</tx></total>"
             self.netmon.read_bandwidth()
             subprocess.check_output.assert_called_once_with(
-                "vnstat --xml -i " + self.netmon.interface
+                "vnstat --xml -i " + self.netmon.model.db["interface"]
                 + "|grep -m 1 total", shell=True)
 
     def test_init(self):
@@ -152,5 +153,5 @@ class TestNetMonClass(unittest.TestCase):
 if __name__ == "__main__":
     FORMAT = "%(asctime)s - %(levelname)s - %(lineno)s - %(message)s"
     logging.basicConfig(level=20, format=FORMAT)
-    logger = logging.getLogger("Netmon Test")
+    logger = logging.getLogger("sanji.networkmonitor")
     unittest.main()

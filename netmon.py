@@ -33,23 +33,22 @@ class NetworkMonitor(Sanji):
     def init(self, *args, **kwargs):
         path_root = os.path.abspath(os.path.dirname(__file__))
         self.model = ModelInitiator("netmon", path_root)
-        self.interface = self.model.db["interface"]
-        self.vnstat_start = self.model.db["enable"]
-        self.threshold = self.model.db["threshold"]
 
-        if self.vnstat_start == 1:
+        if self.model.db["enable"] == 1:
             self.do_start()
 
     def read_bandwidth(self):
-        subprocess.call(["vnstat", "-u", "-i", self.interface])
+        subprocess.call(["vnstat", "-u", "-i", self.model.db["interface"]])
         tmp = subprocess.check_output("vnstat --xml -i " +
-                                      self.interface +
+                                      self.model.db["interface"] +
                                       "|grep -m 1 total", shell=True)
         root = ET.fromstring(tmp)
         count = 0
         for item in root:
             count += int(item.text)
-        _logger.debug("Read Bandwidth %s" % count)
+        _logger.debug(
+            "Interface: %s Read Bandwidth %s" %
+            (self.model.db["interface"], count))
         return count
 
     # This function will be executed after registered.
@@ -59,21 +58,24 @@ class NetworkMonitor(Sanji):
             # message of today
             motd = 0
             count = self.read_bandwidth()
-            if count < self.threshold:
+            if count < self.model.db["threshold"]:
                 sleep(60)
                 continue
 
             while True:
                 if motd == 0:
                     _logger.debug(
-                        "Reach limited threshold %s" % self.threshold)
+                        "Interface: %s Reach limited threshold %s" %
+                        (self.model.db["interface"],
+                            self.model.db["threshold"]))
+
                     self.publish.event.put(
                         "/network/bandwidth/event",
                         data={
                             "info": self.read_bandwidth(),
-                            "enable": self.vnstat_start,
-                            "interface": self.interface,
-                            "threshold": self.threshold
+                            "enable": self.model.db["enable"],
+                            "interface": self.model.db["interface"],
+                            "threshold": self.model.db["threshold"]
                         })
 
                 if motd >= 5 or self.read_bandwidth() == 0:
@@ -87,9 +89,9 @@ class NetworkMonitor(Sanji):
         return response(
             data={
                 "info": self.read_bandwidth(),
-                "enable": self.vnstat_start,
-                "interface": self.interface,
-                "threshold": self.threshold
+                "enable": self.model.db["enable"],
+                "interface": self.model.db["interface"],
+                "threshold": self.model.db["threshold"]
             })
 
     @Route(methods="put", resource="/network/bandwidth", schema=PUT_SCHEMA)
@@ -97,54 +99,50 @@ class NetworkMonitor(Sanji):
         if not hasattr(message, "data"):
             return response(code=400, data={"message": "Invalid Input."})
 
+        if "reset" in message.data and message.data["reset"] == 1:
+            self.do_clean(start=False)
+
+        if "interface" in message.data:
+            if self.model.db["interface"] != message.data["interface"]:
+                self.do_clean(start=False)
+            self.model.db["interface"] = message.data["interface"]
+
+        if "threshold" in message.data:
+            self.model.db["threshold"] = message.data["threshold"]
+
         if "enable" in message.data:
             if message.data["enable"] == 1:
                 self.do_start()
             else:
                 self.do_stop()
             self.model.db["enable"] = message.data["enable"]
-            self.vnstat_stat = message.data["enable"]
-
-        if "reset" in message.data:
-            if message.data["reset"] == 1:
-                _logger.debug("Reset network monitor statistic DB.")
-                self.do_clean()
-
-        if "interface" in message.data:
-            if self.model.db["interface"] != message.data["interface"]:
-                self.do_clean(start=False)
-            self.model.db["interface"] = message.data["interface"]
-            self.interface = message.data["interface"]
-
-        if "threshold" in message.data:
-            self.model.db["threshold"] = message.data["threshold"]
-            self.threshold = message.data["threshold"]
 
         self.model.save_db()
         return response(data=self.model.db)
 
     def do_start(self):
-        _logger.debug("Start network monitor.")
-        self.vnstat_start = 1
-        subprocess.call(["vnstat", "-u", "-i", self.interface])
+        _logger.info("Start network monitor.")
+        subprocess.call(["vnstat", "-u", "-i", self.model.db["interface"]])
         subprocess.call(self.VNSTAT_START, shell=True)
 
     def do_stop(self):
-        _logger.debug("Stop network monitor.")
-        self.vnstat_start = 0
+        _logger.info("Stop network monitor.")
         subprocess.call(self.VNSTAT_STOP, shell=True)
 
     def do_clean(self, start=True):
-        _logger.debug("Clean vnstat with interface %s" % (self.interface,))
+        _logger.info(
+            "Clean vnstat with interface %s" % (self.model.db["interface"],))
         self.do_stop()
         subprocess.call(
-            ["vnstat", "--delete", "--force", "-i", self.interface])
+            ["vnstat", "--delete", "--force", "-i",
+             self.model.db["interface"]])
 
         if start is False:
             return
 
-        _logger.debug("Update vnstat with interface %s" % (self.interface,))
-        subprocess.call(["vnstat", "-u", "-i", self.interface])
+        _logger.debug(
+            "Update vnstat with interface %s" % (self.model.db["interface"],))
+        subprocess.call(["vnstat", "-u", "-i", self.model.db["interface"]])
         self.do_start()
 
 
