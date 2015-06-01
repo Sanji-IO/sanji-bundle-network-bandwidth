@@ -40,29 +40,29 @@ class NetworkMonitor(Sanji):
 
     def read_bandwidth(self):
         try:
-        subprocess.call(["vnstat", "-u", "-i", self.model.db["interface"]])
-        tmp = subprocess.check_output("vnstat --xml -i " +
-                                      self.model.db["interface"] +
-                                      "|grep -m 1 total", shell=True)
-        root = ET.fromstring(tmp)
-        count = 0
-        for item in root:
-            count += int(item.text)
-        _logger.debug(
-            "Interface: %s Read Bandwidth %s" %
-            (self.model.db["interface"], count))
-        return count
+            subprocess.call(["vnstat", "-u", "-i", self.model.db["interface"]])
+            tmp = subprocess.check_output("vnstat --xml -i " +
+                                          self.model.db["interface"] +
+                                          "|grep -m 1 total", shell=True)
+            root = ET.fromstring(tmp)
+            count = 0
+            for item in root:
+                count += int(item.text)
+            _logger.debug(
+                "Interface: %s Read Bandwidth %s" %
+                (self.model.db["interface"], count))
+            return count
         except:
             return 0
 
     # This function will be executed after registered.
     def run(self):
 
-	next_report_dt = datetime.utcnow()
+        next_report_dt = datetime.utcnow()
         prev_usage = None
-	
-	while True:
-	    if self.model.db["enable"]:
+
+        while True:
+            if self.model.db["enable"]:
                 usage = self.read_bandwidth()
                 now_dt = datetime.utcnow()
 
@@ -70,7 +70,7 @@ class NetworkMonitor(Sanji):
                     if now_dt - next_report_dt > timedelta(minutes=1):
                         next_report_dt = now_dt
 
-	        # rapidly report if usage burst 1M under 5 seconds
+                # rapidly report if usage burst 1M under 5 seconds
                 if prev_usage is None or usage - prev_usage > 1024:
                     next_report_dt = now_dt
 
@@ -78,7 +78,6 @@ class NetworkMonitor(Sanji):
                     sleep(5)
                     continue
 
-	   
                 self.publish.event.put(
                     "/network/bandwidth/event",
                     data={
@@ -95,8 +94,8 @@ class NetworkMonitor(Sanji):
 
                 next_report_dt = now_dt + delta
                 prev_usage = usage
-	    else:
-		sleep(1)
+            else:
+                sleep(1)
 
     @Route(methods="get", resource="/network/bandwidth")
     def get_root(self, message, response):
