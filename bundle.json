@@ -1,6 +1,6 @@
 {
   "name": "network-monitor",
-  "version": "0.9.3",
+  "version": "0.9.4",
   "author": "Jimmy Chen",
   "email": "jimmy.chen@moxa.com",
   "description": "Monitoring network bandwidth; alert if reaching watermark.",

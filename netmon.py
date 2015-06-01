@@ -5,6 +5,7 @@ import logging
 import subprocess
 import xml.etree.ElementTree as ET
 from time import sleep
+from datetime import datetime, timedelta
 from sanji.core import Sanji
 from sanji.core import Route
 from sanji.connection.mqtt import Mqtt
@@ -38,6 +39,7 @@ class NetworkMonitor(Sanji):
             self.do_start()
 
     def read_bandwidth(self):
+        try:
         subprocess.call(["vnstat", "-u", "-i", self.model.db["interface"]])
         tmp = subprocess.check_output("vnstat --xml -i " +
                                       self.model.db["interface"] +
@@ -50,39 +52,51 @@ class NetworkMonitor(Sanji):
             "Interface: %s Read Bandwidth %s" %
             (self.model.db["interface"], count))
         return count
+        except:
+            return 0
 
     # This function will be executed after registered.
     def run(self):
 
-        while True:
-            # message of today
-            motd = 0
-            count = self.read_bandwidth()
-            if count < self.model.db["threshold"]:
-                sleep(60)
-                continue
+	next_report_dt = datetime.utcnow()
+        prev_usage = None
+	
+	while True:
+	    if self.model.db["enable"]:
+                usage = self.read_bandwidth()
+                now_dt = datetime.utcnow()
 
-            while True:
-                if motd == 0:
-                    _logger.debug(
-                        "Interface: %s Reach limited threshold %s" %
-                        (self.model.db["interface"],
-                            self.model.db["threshold"]))
+                if usage > self.model.db["threshold"]:
+                    if now_dt - next_report_dt > timedelta(minutes=1):
+                        next_report_dt = now_dt
 
-                    self.publish.event.put(
-                        "/network/bandwidth/event",
-                        data={
-                            "info": self.read_bandwidth(),
-                            "enable": self.model.db["enable"],
-                            "interface": self.model.db["interface"],
-                            "threshold": self.model.db["threshold"]
-                        })
+	        # rapidly report if usage burst 1M under 5 seconds
+                if prev_usage is None or usage - prev_usage > 1024:
+                    next_report_dt = now_dt
 
-                if motd >= 5 or self.read_bandwidth() == 0:
-                    break
+                if next_report_dt > now_dt:
+                    sleep(5)
+                    continue
 
-                motd += 1
-                sleep(60)
+	   
+                self.publish.event.put(
+                    "/network/bandwidth/event",
+                    data={
+                        "info": self.read_bandwidth(),
+                        "enable": self.model.db["enable"],
+                        "interface": self.model.db["interface"],
+                        "threshold": self.model.db["threshold"]
+                    })
+
+                if usage >= self.model.db["threshold"]:
+                    delta = timedelta(minutes=1)
+                else:
+                    delta = timedelta(hours=1)
+
+                next_report_dt = now_dt + delta
+                prev_usage = usage
+	    else:
+		sleep(1)
 
     @Route(methods="get", resource="/network/bandwidth")
     def get_root(self, message, response):
